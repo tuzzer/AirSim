@@ -6,6 +6,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "AirSimGameMode.generated.h"
 
+class UGameUserSettings;
 /**
  * 
  */
@@ -18,4 +19,7 @@ class AIRSIM_API AAirSimGameMode : public AGameModeBase
     
     AAirSimGameMode(const FObjectInitializer& ObjectInitializer);
     
+private:
+    UGameUserSettings* GetGameUserSettings();
+
 };

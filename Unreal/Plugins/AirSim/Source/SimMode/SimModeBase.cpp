@@ -15,8 +15,7 @@ void ASimModeBase::BeginPlay()
 {
     Super::BeginPlay();
 
-    //needs to be done before we call base class
-    initializeSettings();
+    setStencilIDs();
 
     recording_file_.reset(new RecordingFile());
     record_tick_count = 0;
@@ -27,65 +26,27 @@ void ASimModeBase::BeginPlay()
     readSettings();
 }
 
+void ASimModeBase::setStencilIDs()
+{
+    TArray<AActor*> foundActors;
+    UAirBlueprintLib::FindAllActor<AActor>(this, foundActors);
+    TArray<UStaticMeshComponent*> components;
+    int stencil = 0;
+    for (AActor* actor : foundActors) {
+        actor->GetComponents(components);
+        if (components.Num() == 1) {
+            components[0]->SetRenderCustomDepth(true);
+            components[0]->CustomDepthStencilValue = (stencil++) % 256;
+            components[0]->MarkRenderStateDirty();
+        }
+    }
+}
+
 void ASimModeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     recording_file_.release();
 
     Super::EndPlay(EndPlayReason);
-}
-
-
-void ASimModeBase::initializeSettings()
-{
-    //TODO: should this be done somewhere else?
-    //load settings file if found
-    typedef msr::airlib::Settings Settings;
-    try {
-        FString settings_filename = FString(Settings::getFullPath("settings.json").c_str());
-        FString json_fstring;
-        bool load_success = false;
-        bool file_found = FPaths::FileExists(settings_filename);
-        if (file_found) {
-            bool read_sucess = FFileHelper::LoadFileToString(json_fstring, * settings_filename);
-            if (read_sucess) {
-                Settings& settings = Settings::loadJSonString(TCHAR_TO_UTF8(*json_fstring));
-                if (settings.isLoadSuccess()) {
-                    UAirBlueprintLib::setLogMessagesHidden(! settings.getBool("LogMessagesVisible", true));
-                    UAirBlueprintLib::LogMessageString("Loaded settings from ", TCHAR_TO_UTF8(*settings_filename), LogDebugLevel::Informational);
-                    load_success = true;
-                }
-                else
-                    UAirBlueprintLib::LogMessageString("Possibly invalid json string in ", TCHAR_TO_UTF8(*settings_filename), LogDebugLevel::Failure);
-            }
-            else
-                UAirBlueprintLib::LogMessageString("Cannot read settings from ", TCHAR_TO_UTF8(*settings_filename), LogDebugLevel::Failure);
-        }
-
-        if (!load_success) {
-            //create default settings
-            Settings& settings = Settings::loadJSonString("{}");
-            //write some settings in new file otherwise the string "null" is written if all settigs are empty
-            settings.setString("SeeDocsAt", "https://github.com/Microsoft/AirSim/blob/master/docs/settings.md");
-            settings.setDouble("SettingdVersion", 1.0);
-
-            if (!file_found) {
-                std::string json_content;
-                //TODO: there is a crash in Linux due to settings.saveJSonString(). Remove this workaround after we only support Unreal 4.17
-                //https://answers.unrealengine.com/questions/664905/unreal-crashes-on-two-lines-of-extremely-simple-st.html
-#ifdef _WIN32
-                json_content = settings.saveJSonString();
-#else
-                json_content = "{ \"SettingdVersion\": 1, \"SeeDocsAt\": \"https://github.com/Microsoft/AirSim/blob/master/docs/settings.md\"}";
-#endif
-                json_fstring = FString(json_content.c_str());
-                FFileHelper::SaveStringToFile(json_fstring, * settings_filename);
-                UAirBlueprintLib::LogMessageString("Created settings file at ", TCHAR_TO_UTF8(*settings_filename), LogDebugLevel::Informational);
-            }
-        }
-    }
-    catch (std::exception& ex) {
-        UAirBlueprintLib::LogMessage(FString("Error loading settings from ~/Documents/AirSim/settings.json"), FString(ex.what()), LogDebugLevel::Failure, 30);
-    }
 }
 
 void ASimModeBase::readSettings()
@@ -107,6 +68,7 @@ void ASimModeBase::readSettings()
         }
     }
 
+    std::string simmode_name = settings.getString("SimMode", "");
     usage_scenario = settings.getString("UsageScenario", "");
     default_vehicle_config = settings.getString("DefaultVehicleConfig", "SimpleFlight");
    
@@ -117,7 +79,7 @@ void ASimModeBase::readSettings()
     api_server_address = settings.getString("LocalHostIp", "");
     is_record_ui_visible = settings.getBool("RecordUIVisible", true);
 
-    std::string view_mode_string = settings.getString("ViewMode", "FlyWithMe");
+    std::string view_mode_string = settings.getString("ViewMode", simmode_name == "" ? "FlyWithMe" : "SpringArmChase");
     if (view_mode_string == "FlyWithMe")
         initial_view_mode = ECameraDirectorMode::CAMERA_DIRECTOR_MODE_FLY_WITH_ME;
     else if (view_mode_string == "Fpv")
@@ -126,7 +88,11 @@ void ASimModeBase::readSettings()
         initial_view_mode = ECameraDirectorMode::CAMERA_DIRECTOR_MODE_MANUAL;
     else if (view_mode_string == "GroundObserver")
         initial_view_mode = ECameraDirectorMode::CAMERA_DIRECTOR_MODE_GROUND_OBSERVER;
-
+    else if (view_mode_string == "SpringArmChase")
+        initial_view_mode = ECameraDirectorMode::CAMERA_DIRECTOR_MODE_SPRINGARM_CHASE;
+    else
+        UAirBlueprintLib::LogMessage("ViewMode setting is not recognized: ", view_mode_string.c_str(), LogDebugLevel::Failure);
+        
     physics_engine_name = settings.getString("PhysicsEngineName", "FastPhysicsEngine");
     enable_collision_passthrough = settings.getBool("EnableCollisionPassthrogh", false);
     clock_type = settings.getString("ClockType", 
@@ -153,7 +119,7 @@ void ASimModeBase::reset()
     //Should be overridden by derived classes
 }
 
-AVehiclePawnBase* ASimModeBase::getFpvVehiclePawn()
+VehiclePawnWrapper* ASimModeBase::getFpvVehiclePawnWrapper()
 {
     //Should be overridden by derived classes
     return nullptr;
