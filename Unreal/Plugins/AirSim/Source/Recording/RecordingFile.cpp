@@ -11,7 +11,7 @@ RecordingFile::RecordingFile(std::vector <std::string> columns)
 {
     this->columns = columns;
 }
-void RecordingFile::appendRecord(TArray<uint8>& image_data, VehiclePawnWrapper* wrapper)
+void RecordingFile::appendRecord(TArray<uint8>& image_data, VehiclePawnWrapper* wrapper, std::string dir_name)
 {
     if (image_data.Num() == 0)
         return;
@@ -20,6 +20,10 @@ void RecordingFile::appendRecord(TArray<uint8>& image_data, VehiclePawnWrapper* 
     FString filePath;
 
     std::string filename = std::string("img_").append(std::to_string(images_saved_)).append(".png");
+    if (dir_name != "")
+    {
+        filename = common_utils::FileSystem::combine(dir_name, filename);
+    }
 
     try {    
         filePath = FString(common_utils::FileSystem::combine(image_path_, filename).c_str());
