@@ -17,7 +17,7 @@ FRecordingThread::FRecordingThread()
 }
 
 
-void FRecordingThread::startRecording(std::vector<msr::airlib::VehicleCameraBase*> cameras, std::vector<int> image_type_ids, const msr::airlib::Kinematics::State* kinematics, const RecordingSettings& settings, std::vector <std::string> columns)
+void FRecordingThread::startRecording(const std::vector<msr::airlib::VehicleCameraBase*>& cameras, const std::vector<int>& image_type_ids, const msr::airlib::Kinematics::State* kinematics, const RecordingSettings& settings, std::vector <std::string> columns)
 {
     stopRecording();
 
@@ -86,16 +86,16 @@ uint32 FRecordingThread::Run()
 
                 for (int i = 0; i < cameras_.size(); i++)
                 {
+                    std::string image_name = "img_" + std::to_string(img_count);
                     if (cameras_[i] != nullptr)
                     {
-                        for (auto img_id = image_type_ids_.begin(); img_id != image_type_ids_.end(); ++img_id)
+                        std::string camera_name = "camera_" + std::to_string(i);
+                        for (auto type_id = image_type_ids_.begin(); type_id != image_type_ids_.end(); ++type_id)
                         {
-                            auto response = cameras_[i]->getImage(static_cast<msr::airlib::VehicleCameraBase::ImageType>(*img_id), false, true);
+                            auto response = cameras_[i]->getImage(static_cast<msr::airlib::VehicleCameraBase::ImageType>(*type_id), false, true);
                             TArray<uint8_t> image_data;
                             image_data.Append(response.image_data_uint8.data(), response.image_data_uint8.size());
-                            std::string camera_name = "camera_" + std::to_string(i);
-                            std::string img_type_name = "img_type_" + std::to_string(*img_id);
-                            std::string image_name = "img_" + std::to_string(img_count);
+                            std::string img_type_name = "img_type_" + std::to_string(*type_id);
                             recording_file_->appendRecord(image_data, kinematics_, camera_name, img_type_name, image_name);
                         }
                     }
