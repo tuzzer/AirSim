@@ -72,7 +72,7 @@ void ASimModeBase::readSettings()
     clock_type = "";
     engine_sound = true;
     clock_speed = 1.0f;
-
+    record_with_cameras;
 
     typedef msr::airlib::Settings Settings;
 
@@ -162,6 +162,16 @@ void ASimModeBase::readSettings()
 
     clock_speed = settings.getFloat("ClockSpeed", 1.0f);
 
+    char* cameras_ids = strdup(settings.getString("RecordWithCameras", "0").c_str());
+    char* tempBuff = strtok(cameras_ids, " ,;/");
+    while (tempBuff != nullptr)
+    {
+        const int camera_id = atoi(tempBuff);
+        record_with_cameras.insert(camera_id); // There might be invalid camera ids at this point
+        tempBuff = strtok(nullptr, " ,;/");
+    }
+    free(cameras_ids);
+
     Settings record_settings;
     if (settings.getChild("Recording", record_settings)) {
         recording_settings.record_on_move = record_settings.getBool("RecordOnMove", recording_settings.record_on_move);
@@ -224,8 +234,22 @@ ECameraDirectorMode ASimModeBase::getInitialViewMode()
 
 void ASimModeBase::startRecording()
 {
-    FRecordingThread::startRecording(getFpvVehiclePawnWrapper()->getCameraConnector(0),
-        getFpvVehiclePawnWrapper()->getKinematics(), recording_settings, columns);
+    if (getFpvVehiclePawnWrapper() != nullptr)
+    {
+        const int camera_count = getFpvVehiclePawnWrapper()->getCameraCount();
+        std::vector<msr::airlib::VehicleCameraBase*> cameras(camera_count);
+
+        for (auto itr = record_with_cameras.begin(); itr != record_with_cameras.end(); ++itr)
+        {
+            if (*itr >= 0 && *itr < getFpvVehiclePawnWrapper()->getCameraCount())
+            {
+                cameras[*itr] = getFpvVehiclePawnWrapper()->getCameraConnector(*itr);
+            }
+        }
+
+        FRecordingThread::startRecording(cameras,
+            getFpvVehiclePawnWrapper()->getKinematics(), recording_settings, columns);
+    }
 }
 
 bool ASimModeBase::toggleRecording()

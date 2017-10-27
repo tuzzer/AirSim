@@ -12,7 +12,7 @@ public:
     RecordingFile(std::vector <std::string> columns);
     ~RecordingFile();
 
-    void appendRecord(TArray<uint8>& compressedPng, const msr::airlib::Kinematics::State* kinematics);
+    void appendRecord(TArray<uint8>& compressedPng, const msr::airlib::Kinematics::State* kinematics, std::string dir_name="");
     void appendColumnHeader(std::vector <std::string> columns);
     void startRecording();
     void stopRecording(bool ignore_if_stopped);
