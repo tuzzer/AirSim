@@ -162,6 +162,16 @@ void ASimModeBase::readSettings()
     }
     free(cameras_ids);
 
+    char* image_type_ids = strdup(settings.getString("RecordImageTypes", "0").c_str());
+    tempBuff = strtok(image_type_ids, " ,;/");
+    while (tempBuff != nullptr)
+    {
+        const int image_type_id = atoi(tempBuff);
+        record_image_types.insert(image_type_id); // There might be invalid image type ids at this point
+        tempBuff = strtok(nullptr, " ,;/");
+    }
+    free(image_type_ids);
+
     Settings record_settings;
     if (settings.getChild("Recording", record_settings)) {
         recording_settings.record_on_move = record_settings.getBool("RecordOnMove", recording_settings.record_on_move);
@@ -226,18 +236,30 @@ void ASimModeBase::startRecording()
 {
     if (getFpvVehiclePawnWrapper() != nullptr)
     {
+        // Create a vector of valid cameras
         const int camera_count = getFpvVehiclePawnWrapper()->getCameraCount();
         std::vector<msr::airlib::VehicleCameraBase*> cameras(camera_count);
 
         for (auto itr = record_with_cameras.begin(); itr != record_with_cameras.end(); ++itr)
         {
-            if (*itr >= 0 && *itr < getFpvVehiclePawnWrapper()->getCameraCount())
+            if (*itr >= 0 && *itr < camera_count)
             {
                 cameras[*itr] = getFpvVehiclePawnWrapper()->getCameraConnector(*itr);
             }
         }
 
-        FRecordingThread::startRecording(cameras,
+        // Create a vector of valid image types
+        const int image_type_count = static_cast<int> (msr::airlib::VehicleCameraBase::ImageType::Count);
+        std::vector<int> image_type_ids;
+        for (auto itr = record_image_types.begin(); itr != record_image_types.end(); ++itr)
+        {
+            if (*itr >= 0 && *itr < image_type_count)
+            {
+                image_type_ids.push_back(*itr);
+            }
+        }
+
+        FRecordingThread::startRecording(cameras, image_type_ids,
             getFpvVehiclePawnWrapper()->getKinematics(), recording_settings, columns, getFpvVehiclePawnWrapper());
     }
 }

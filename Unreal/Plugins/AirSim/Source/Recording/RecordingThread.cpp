@@ -17,7 +17,7 @@ FRecordingThread::FRecordingThread()
 }
 
 
-void FRecordingThread::startRecording(std::vector<msr::airlib::VehicleCameraBase*> cameras, const msr::airlib::Kinematics::State* kinematics, const RecordingSettings& settings, std::vector <std::string> columns, VehiclePawnWrapper* wrapper)
+void FRecordingThread::startRecording(std::vector<msr::airlib::VehicleCameraBase*> cameras, std::vector<int> image_type_ids, const msr::airlib::Kinematics::State* kinematics, const RecordingSettings& settings, std::vector <std::string> columns, VehiclePawnWrapper* wrapper)
 {
     stopRecording();
 
@@ -25,6 +25,7 @@ void FRecordingThread::startRecording(std::vector<msr::airlib::VehicleCameraBase
 
     instance_.reset(new FRecordingThread());
     instance_->cameras_ = cameras;
+    instance_->image_type_ids_ = image_type_ids;
     instance_->kinematics_ = kinematics;
     instance_->settings_ = settings;
     instance_->wrapper_ = wrapper;
@@ -83,17 +84,24 @@ uint32 FRecordingThread::Run()
 
                 // todo: should we go as fast as possible, or should we limit this to a particular number of
                 // frames per second?
+
                 for (int i = 0; i < cameras_.size(); i++)
                 {
                     if (cameras_[i] != nullptr)
                     {
-                        auto response = cameras_[i]->getImage(msr::airlib::VehicleCameraBase::ImageType::Scene, false, true);
-                        TArray<uint8_t> image_data;
-                        image_data.Append(response.image_data_uint8.data(), response.image_data_uint8.size());
-                        std::string dir_name = "camera_" + std::to_string(i);
-                        recording_file_->appendRecord(image_data, wrapper_, dir_name);
+                        for (auto img_id = image_type_ids_.begin(); img_id != image_type_ids_.end(); ++img_id)
+                        {
+                            auto response = cameras_[i]->getImage(static_cast<msr::airlib::VehicleCameraBase::ImageType>(*img_id), false, true);
+                            TArray<uint8_t> image_data;
+                            image_data.Append(response.image_data_uint8.data(), response.image_data_uint8.size());
+                            std::string camera_name = "camera_" + std::to_string(i);
+                            std::string img_type_name = "img_type_" + std::to_string(*img_id);
+                            std::string image_name = "img_" + std::to_string(img_count);
+                            recording_file_->appendRecord(image_data, wrapper_, camera_name, img_type_name, image_name);
+                        }
                     }
                 }
+                img_count++;
             }
         }
     }
