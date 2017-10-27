@@ -61,7 +61,6 @@ void ASimModeBase::readSettings()
     clock_type = "";
     engine_sound = true;
     clock_speed = 1.0f;
-    record_with_cameras;
 
     typedef msr::airlib::Settings Settings;
 
