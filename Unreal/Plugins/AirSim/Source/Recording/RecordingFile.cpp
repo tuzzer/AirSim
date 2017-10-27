@@ -12,34 +12,39 @@ RecordingFile::RecordingFile(std::vector <std::string> columns)
     this->columns = columns;
 }
 
-void RecordingFile::appendRecord(TArray<uint8>& image_data, const msr::airlib::Kinematics::State* kinematics, std::string dir_name)
+void RecordingFile::appendRecord(TArray<uint8>& image_data, const msr::airlib::Kinematics::State* kinematics, 
+    const std::string& camera_name, const std::string& img_type_name, const std::string& img_name)
 {
     if (image_data.Num() == 0)
         return;
 
     bool imageSavedOk = false;
-    FString filePath;
 
-    std::string filename = std::string("img_").append(std::to_string(images_saved_)).append(".png");
-    if (dir_name != "")
+    std::string filename = img_name + ".png";
+
+    if (img_type_name != "")
     {
-        filename = common_utils::FileSystem::combine(dir_name, filename);
+        filename = common_utils::FileSystem::combine(img_type_name, filename);
+    }
+
+    if (camera_name != "")
+    {
+        filename = common_utils::FileSystem::combine(camera_name, filename);
     }
 
     try {    
         FString image_file_path = FString(common_utils::FileSystem::combine(image_path_, filename).c_str());
         imageSavedOk = FFileHelper::SaveArrayToFile(image_data, *image_file_path);
+
+        // If render command is complete, save image along with position and orientation
+        if (imageSavedOk) {
+            writeString(getLine(*kinematics, filename));
+
+            UAirBlueprintLib::LogMessage(TEXT("Screenshot saved to:"), image_file_path, LogDebugLevel::Success);
+        }
     }
     catch(std::exception& ex) {
         UAirBlueprintLib::LogMessage(TEXT("Image file save failed"), FString(ex.what()), LogDebugLevel::Failure);        
-    }
-    // If render command is complete, save image along with position and orientation
-
-    if (imageSavedOk) {
-        writeString(getLine(*kinematics, filename));
-
-        UAirBlueprintLib::LogMessage(TEXT("Screenshot saved to:"), filePath, LogDebugLevel::Success);
-        images_saved_++;
     }
 }
 
